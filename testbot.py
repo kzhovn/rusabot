@@ -1,23 +1,11 @@
-#Tutorials:
-#https://realpython.com/how-to-make-a-discord-bot-python/
-#https://codeburst.io/discord-py-the-quickstart-guide-2587abc136ab
-
 #Docs:
 #https://discordpy.readthedocs.io/en/latest/intro.html
-
-#Background:
-#https://stackoverflow.com/questions/50757497/simplest-async-await-example-possible-in-python
-
+from bot_token import BOT_TOKEN
 
 #import os
-
 import discord
 from discord.ext.commands import Bot
-#from dotenv import load_dotenv
 
-#load_dotenv()
-#TOKEN = os.getenv('DISCORD_TOKEN')
-TOKEN = "Nzg2NDI0NDcyOTc4MTk0NDM0.X9GM3Q.iZX0kWksHQPOWBYBtc8KMzy3OFo"
 testbot = Bot(command_prefix = "/")
 
 #when starting bot
@@ -41,18 +29,18 @@ async def on_message(message): #check every message
 async def on_reaction_add(reaction, user):
     if reaction.emoji == "🌳":
         await reaction.message.channel.send("🌳🌳🌳")
-    elif reaction.emoji == "🔁":
 
-    
-#on /ping (or other prefix)
+#on /ping, respond
 @testbot.command()
 async def ping(context):
     await context.send("pong!")
     await context.message.add_reaction("🏓")
 
+# add user id to list
 user_list = []
 @testbot.command()
 async def add_user(context):
     user_list.append(context.message.author.id)
     print(user_list)
-testbot.run(TOKEN)
+
+testbot.run(BOT_TOKEN)
