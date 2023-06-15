@@ -46,7 +46,7 @@ class TodoList:
     def __repr__(self) -> str:
         return str(self.todos)
 
-rusabot = Bot(command_prefix = ".", intents=discord.Intents.default())
+rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
 user_todos = TodoList()
 completed_user_todos = TodoList()
 
