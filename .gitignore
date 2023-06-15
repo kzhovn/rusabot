@@ -1,2 +1,3 @@
 .env
-token.py
+bot_token.py
+todo.pkl
