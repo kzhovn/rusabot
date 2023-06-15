@@ -75,7 +75,7 @@ async def on_raw_reaction_add(payload):
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
         user_todos.remove_todo(message)
 
-#on >todos, print current todos in channel
+#on .list, print current todos in channel
 @rusabot.command()
 async def list(context):
     await context.message.channel.send(user_todos.pretty_print())
