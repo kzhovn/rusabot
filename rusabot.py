@@ -45,10 +45,8 @@ class TodoList:
                 message = await get_message(self.last_list_id, self.last_list_channel)
                 new_message_content = ""
                 for line in message.content.splitlines(keepends = True):
-                    print(line)
-                    print(todo.compose_line())
                     if line.strip() == todo.compose_line().strip():
-                        new_message_content += ("✅" + line[1:])
+                        new_message_content += ("~~" + line + "~~")
                     else:
                         new_message_content += (line)
 
