@@ -46,7 +46,7 @@ class TodoList:
                 new_message_content = ""
                 for line in message.content.splitlines(keepends = True):
                     if line.strip() == todo.compose_line().strip():
-                        new_message_content += ("~~" + line + "~~")
+                        new_message_content += ("- ~~" + line[1:].strip() + "~~\n")
                     else:
                         new_message_content += (line)
 
