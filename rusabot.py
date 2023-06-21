@@ -4,6 +4,7 @@ from bot_token import BOT_TOKEN
 import os
 import pickle
 import discord
+import random
 from discord.ext.commands import Bot
 
 todo_file = 'todo.pkl'
@@ -64,8 +65,12 @@ class TodoList:
     def __repr__(self) -> str:
         return str(self.todos)
 
+
+
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
 user_todos = TodoList()
+
+
 
 @rusabot.event
 async def on_ready():
@@ -88,12 +93,22 @@ async def on_raw_reaction_add(payload):
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
         await user_todos.remove_todo(message)
 
-#on .list, print current todos in channel
+
+
+
+# print current todos in channel
 @rusabot.command()
 async def list(context):
     new_list = await context.message.channel.send(user_todos.pretty_print())
     user_todos.last_list_id = new_list.id
     user_todos.last_list_channel = context.message.channel.id
+
+# give a random todo item
+@rusabot.command()
+async def rand(context):
+    random_todo = random.choice(__builtins__.list(user_todos.todos.values()))
+    await context.message.channel.send(random_todo.compose_line())
+
 
 
 def is_todo(message) -> bool:
@@ -101,10 +116,5 @@ def is_todo(message) -> bool:
         return True
     else:
         return False
-
-# @rusabot.command()
-# async def add_user(context):
-#     user_list.append(context.message.author.id)
-#     print(user_list)
 
 rusabot.run(BOT_TOKEN)
