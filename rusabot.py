@@ -7,6 +7,8 @@ import discord
 import random
 from discord.ext.commands import Bot
 
+NO_TODOS = "🎉 No todos 🎉"
+
 
 async def get_message(message_id, channel_id):
     return await rusabot.get_channel(channel_id).fetch_message(message_id)
@@ -135,8 +137,11 @@ async def list(context, *args):
 # give a random todo item
 @rusabot.command()
 async def rand(context):
-    random_todo = random.choice(__builtins__.list(user_todos.todos.values()))
-    await context.message.channel.send(random_todo.compose_line())
+    if len(user_todos.todos) != 0:
+        random_todo = random.choice(__builtins__.list(user_todos.todos.values()))
+        await context.message.channel.send(random_todo.compose_line())
+    else:
+        await context.message.channel.send(NO_TODOS)
 
 # # display a daily list that refreshes complete status every day
 # @rusabot.command()
@@ -150,7 +155,7 @@ async def rand(context):
 
 async def print_list_to_channel(context, user_list: TodoList) -> None:
     if len(user_list.todos) == 0:
-        await context.message.channel.send("🎉 No todos 🎉")
+        await context.message.channel.send(NO_TODOS)
         return
 
     new_list = await context.message.channel.send(user_list.pretty_print())
