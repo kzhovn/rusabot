@@ -1,4 +1,4 @@
 .env
 bot_token.py
-todo.pkl
+*.pkl
 __pycache__/
