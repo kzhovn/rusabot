@@ -72,29 +72,9 @@ class TodoList:
     def __repr__(self) -> str:
         return str(self.todos)
 
-# class DailyTodoList(TodoList):
-#     def __init__(self):
-#         super().__init__("daily")
-
-#     def add_todo(self, message : discord.Message):
-#         self.todos[message.id] = DailyTodo(message)
-#         pickle.dump(self.todos, open(self.todo_file, 'wb'))
-#         print("Adding daily todo" + self.todos[message.id].text)
-
-
-# class DailyTodo(Todo):
-#     def __init__(self, message):
-#         super().__init__(message)
-#         self.complete = False
-#         self.last_complete = None
-
-#         self.text = message.content[10:].strip()
-
-
 
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
 user_todos = TodoList()
-# user_dailies = DailyTodoList()
 user_lists = [user_todos]
 
 
@@ -142,16 +122,6 @@ async def rand(context):
         await context.message.channel.send(random_todo.compose_line())
     else:
         await context.message.channel.send(NO_TODOS)
-
-# # display a daily list that refreshes complete status every day
-# @rusabot.command()
-# async def daily(context):
-#     await print_list_to_channel(context, user_dailies)
-
-# # add text after command to the daily list
-# @rusabot.command()
-# async def add_daily(context):
-#     user_dailies.add_todo(context.message)
 
 async def print_list_to_channel(context, user_list: TodoList) -> None:
     if len(user_list.todos) == 0:
