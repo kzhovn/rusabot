@@ -10,7 +10,7 @@ from discord.ext.commands import Bot
 NO_TODOS = "🎉 No todos 🎉"
 
 
-async def get_message(message_id, channel_id):
+async def get_message(message_id: int, channel_id: int):
     return await rusabot.get_channel(channel_id).fetch_message(message_id)
 
 class Todo:
@@ -76,19 +76,26 @@ class TodoList:
     #     return pickle.load(open(filename, 'rb'))
 
     def __repr__(self) -> str:
-        return f'Todos: {self.todos}\nPrev list: {self.last_list_channel}, {self.last_list_id}'
+        return f'List {self.name}\nTodos: {self.todos}\nPrev list: {self.last_list_channel}, {self.last_list_id}\n'
 
 
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
-user_todolist_names = ['todo']
 user_todolists = []
+todolist_names_file = 'data/todolist_names.pkl'
 
 @rusabot.event
 async def on_ready():
-    for name in user_todolist_names:
+    if os.path.isfile(todolist_names_file):
+        todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+    else: # if we're new, just use the default list
+        todolist_names = ['todo']
+        pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
+
+    for name in todolist_names:
         if os.path.isfile(f'data/{name}.pkl'):
             user_todolists.append(pickle.load(open(f'data/{name}.pkl', 'rb')))
         else:
+            print(f'List {name} not found, creating.')
             user_todolists.append(TodoList(name))
 
     print(user_todolists)
@@ -126,6 +133,50 @@ async def rand(context):
         await context.message.channel.send(random_todo.compose_line())
     else:
         await context.message.channel.send(NO_TODOS)
+
+@rusabot.command()
+async def newlist(context, *args):
+    if len(args) == 0:
+        await context.message.channel.send("Must specify a name for the list, e.g. `.newlist work`.")
+        return
+    if len(args) > 1:
+        await context.message.channel.send("List name must be one word, no spaces permitted, e.g. `.newlist work`.")
+        return
+
+    todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+    name = args[0]
+
+    if name in todolist_names:
+        await context.message.channel.send("List name already in use, try another one.")
+    else:
+        todolist_names.append(name)
+        pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
+
+        new_list = TodoList(name)
+        user_todolists.append(new_list)
+        new_list.pkl()
+        print(f'Created list {name}')
+
+@rusabot.command()
+async def removelist(context, *args):
+    if len(args) == 0:
+        await context.message.channel.send("Must specify at least one name for the list(s) to be removed, e.g. `.removelist work`.")
+        return
+
+    todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+    for name in args:
+        if name == 'todo':
+            await context.message.channel.send("Cannot delete default list 'todo'.")
+        elif name in todolist_names:
+            todolist_names.remove(name)
+            print(f'Removing list {name}')
+        else:
+            await context.message.channel.send(f"List {name} doesn't exist.")
+
+    pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
+
+
+
 
 
 
