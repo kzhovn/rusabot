@@ -86,11 +86,11 @@ class TodoList:
 
 
     def __repr__(self) -> str:
-        return f'List {self.name}\nTodos: {self.todos}\nPrev list: {self.last_list_channel}, {self.last_list_id}\n'
+        return f'Todos for list {self.name}: {self.todos}\n'
 
 
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
-user_todolists = []
+user_todolists = {}
 todolist_names_file = 'data/todolist_names.pkl'
 
 @rusabot.event
@@ -103,10 +103,10 @@ async def on_ready():
 
     for name in todolist_names:
         if os.path.isfile(f'data/{name}.pkl'):
-            user_todolists.append(pickle.load(open(f'data/{name}.pkl', 'rb')))
+            user_todolists[name] = (pickle.load(open(f'data/{name}.pkl', 'rb')))
         else:
             print(f'List {name} not found, creating.')
-            user_todolists.append(TodoList(name))
+            user_todolists[name] = (TodoList(name))
 
     print(user_todolists)
 
@@ -116,7 +116,7 @@ async def on_ready():
 @rusabot.event
 async def on_message(message):
     if is_todo(message):
-        user_todolists[0].add_todo(message)
+        user_todolists['todo'].add_todo(message)
 
     await rusabot.process_commands(message)
 
@@ -124,22 +124,22 @@ async def on_message(message):
 async def on_raw_reaction_add(payload):
     message = await get_message(payload.message_id, payload.channel_id)
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
-        await user_todolists[0].remove_todo(message)
+        await user_todolists['todo'].remove_todo(message)
 
 
 # print current todos in channel
 @rusabot.command()
 async def list(context, *args):
     if len(args) == 0:
-        await user_todolists[0].print_list_to_channel(context)
+        await user_todolists['todo'].print_list_to_channel(context)
     else:
         pass # TODO: print list with that name
 
 # give a random todo item
 @rusabot.command()
 async def rand(context):
-    if len(user_todolists[0].todos) != 0:
-        random_todo = random.choice(__builtins__.list(user_todolists[0].todos.values()))
+    if len(user_todolists['todo'].todos) != 0:
+        random_todo = random.choice(__builtins__.list(user_todolists['todo'].todos.values()))
         await context.message.channel.send(random_todo.compose_line())
     else:
         await context.message.channel.send(NO_TODOS)
@@ -163,7 +163,7 @@ async def newlist(context, *args):
         pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
 
         new_list = TodoList(name)
-        user_todolists.append(new_list)
+        user_todolists[name] = new_list
         new_list.pkl()
         print(f'Created list {name}')
 
