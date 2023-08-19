@@ -1,9 +1,9 @@
 # Discord todo bot
 
-## Adding and removing todos
+## Usage
 To add a todo, send "--" and then the text of the todo, e.g. "-- Send email".
 
-To remove a todo, react to the initial todo message, with ✅ or ❌.
+To remove a todo, react to the initial todo message, with ✅ or ❌. ❌ will also delete a bot message.
 
 ## Commands
 * `.list [name]`: lists all todos from the given list with a link to the original message; if no name is given uses the default list
