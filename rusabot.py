@@ -8,6 +8,7 @@ import random
 from discord.ext.commands import Bot
 
 NO_TODOS = "🎉 No todos 🎉"
+DEFAULT_LIST = "todo"
 
 
 async def get_message(message_id: int, channel_id: int):
@@ -71,10 +72,6 @@ class TodoList:
     def pkl(self):
         pickle.dump(self, open(self.get_file_name(), 'wb'))
 
-    # @classmethod # https://stackoverflow.com/a/63442503
-    # def unpkl(cls, filename: str):
-    #     return pickle.load(open(filename, 'rb'))
-
     async def print_list_to_channel(self, context) -> None:
         if len(self.todos) == 0:
             await context.message.channel.send(NO_TODOS)
@@ -96,9 +93,9 @@ todolist_names_file = 'data/todolist_names.pkl'
 @rusabot.event
 async def on_ready():
     if os.path.isfile(todolist_names_file):
-        todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+        todolist_names = get_list_of_lists()
     else: # if we're new, just use the default list
-        todolist_names = ['todo']
+        todolist_names = [DEFAULT_LIST]
         pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
 
     for name in todolist_names:
@@ -116,7 +113,8 @@ async def on_ready():
 @rusabot.event
 async def on_message(message):
     if is_todo(message):
-        user_todolists['todo'].add_todo(message)
+        print(get_list_name(message))
+        user_todolists[get_list_name(message)].add_todo(message)
 
     await rusabot.process_commands(message)
 
@@ -124,22 +122,30 @@ async def on_message(message):
 async def on_raw_reaction_add(payload):
     message = await get_message(payload.message_id, payload.channel_id)
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
-        await user_todolists['todo'].remove_todo(message)
+        await user_todolists[get_list_name(message)].remove_todo(message)
 
 
 # print current todos in channel
 @rusabot.command()
 async def list(context, *args):
     if len(args) == 0:
-        await user_todolists['todo'].print_list_to_channel(context)
+        await user_todolists[DEFAULT_LIST].print_list_to_channel(context)
+    elif args[0] == 'all':
+        for todolist in user_todolists.values():
+            await todolist.print_list_to_channel(context)
     else:
-        pass # TODO: print list with that name
+        await user_todolists[args[0]].print_list_to_channel(context)
 
 # give a random todo item
 @rusabot.command()
-async def rand(context):
-    if len(user_todolists['todo'].todos) != 0:
-        random_todo = random.choice(__builtins__.list(user_todolists['todo'].todos.values()))
+async def rand(context, *args):
+    if len(args) == 0:
+        list_name = DEFAULT_LIST
+    else: #TODO: take multiple lists
+        list_name = args[0]
+
+    if len(user_todolists[list_name].todos) != 0:
+        random_todo = random.choice(__builtins__.list(user_todolists[list_name].todos.values()))
         await context.message.channel.send(random_todo.compose_line())
     else:
         await context.message.channel.send(NO_TODOS)
@@ -153,11 +159,13 @@ async def newlist(context, *args):
         await context.message.channel.send("List name must be one word, no spaces permitted, e.g. `.newlist work`.")
         return
 
-    todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+    todolist_names = get_list_of_lists()
     name = args[0]
 
     if name in todolist_names:
         await context.message.channel.send("List name already in use, try another one.")
+    elif name == 'all':
+        await context.message.channel.send("List name 'all' is reserved.")
     else:
         todolist_names.append(name)
         pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
@@ -173,10 +181,10 @@ async def removelist(context, *args):
         await context.message.channel.send("Must specify at least one name for the list(s) to be removed, e.g. `.removelist work`.")
         return
 
-    todolist_names = pickle.load(open(todolist_names_file, 'rb'))
+    todolist_names = get_list_of_lists()
     for name in args:
-        if name == 'todo':
-            await context.message.channel.send("Cannot delete default list 'todo'.")
+        if name == DEFAULT_LIST:
+            await context.message.channel.send(f"Cannot delete default list '{DEFAULT_LIST}'.")
         elif name in todolist_names:
             todolist_names.remove(name)
             print(f'Removing list {name}')
@@ -191,5 +199,30 @@ def is_todo(message) -> bool:
         return True
     else:
         return False
+
+def get_list_name(message) -> str:
+    if not is_todo(message):
+        raise Exception(f"{message.content} is not a todo.")
+
+    colon_split_msg = message.content.split(':', 1)
+    print(colon_split_msg)
+    if len(colon_split_msg) == 1:
+        return DEFAULT_LIST
+
+    first_word = strip_bullet_points(colon_split_msg[0]).strip()
+    print(first_word)
+    if first_word in get_list_of_lists():
+        return first_word
+
+    return DEFAULT_LIST # if does not exist, assume we are just writing a colon
+
+def strip_bullet_points(todo: str) -> str:
+    if todo[:2] == "--":
+        return todo[2:].lstrip()
+    else:
+        raise Exception(f"{todo} is not a todo; expected leading '--'")
+
+def get_list_of_lists():
+    return pickle.load(open(todolist_names_file, 'rb'))
 
 rusabot.run(BOT_TOKEN)
