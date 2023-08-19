@@ -124,6 +124,8 @@ async def on_raw_reaction_add(payload):
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
         await user_todolists[get_list_name(message)].remove_todo(message)
 
+    if message.author == rusabot.user and payload.emoji.name == "❌":
+        await message.delete()
 
 # print current todos in channel
 @rusabot.command()
