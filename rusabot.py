@@ -75,6 +75,16 @@ class TodoList:
     # def unpkl(cls, filename: str):
     #     return pickle.load(open(filename, 'rb'))
 
+    async def print_list_to_channel(self, context) -> None:
+        if len(self.todos) == 0:
+            await context.message.channel.send(NO_TODOS)
+            return
+
+        new_list = await context.message.channel.send(self.pretty_print())
+        self.last_list_id = new_list.id
+        self.last_list_channel = context.message.channel.id
+
+
     def __repr__(self) -> str:
         return f'List {self.name}\nTodos: {self.todos}\nPrev list: {self.last_list_channel}, {self.last_list_id}\n'
 
@@ -121,7 +131,7 @@ async def on_raw_reaction_add(payload):
 @rusabot.command()
 async def list(context, *args):
     if len(args) == 0:
-        await print_list_to_channel(context, user_todolists[0])
+        await user_todolists[0].print_list_to_channel(context)
     else:
         pass # TODO: print list with that name
 
@@ -175,19 +185,6 @@ async def removelist(context, *args):
 
     pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
 
-
-
-
-
-
-async def print_list_to_channel(context, user_list: TodoList) -> None:
-    if len(user_list.todos) == 0:
-        await context.message.channel.send(NO_TODOS)
-        return
-
-    new_list = await context.message.channel.send(user_list.pretty_print())
-    user_list.last_list_id = new_list.id
-    user_list.last_list_channel = context.message.channel.id
 
 def is_todo(message) -> bool:
     if message.content.startswith("--") and not message.author.bot:
