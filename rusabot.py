@@ -87,6 +87,7 @@ class TodoList:
     def update_todo(self, message):
         # TODO: update line in print?
         self.todos[message.id].update(message)
+        self.pkl()
 
     def __repr__(self) -> str:
         return f'Todos for list {self.name}: {self.todos}\n'
