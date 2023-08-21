@@ -61,6 +61,8 @@ class TodoList:
         self.last_list_id: int = None
         self.last_list_channel: int = None
 
+        self.pkl()
+
     def get_file_name(self) -> str:
         return f'data/{self.name}.pkl'
 
@@ -127,6 +129,8 @@ async def on_ready():
         todolist_names = get_list_of_lists()
     else: # if we're new, just use the default list
         todolist_names = [DEFAULT_LIST]
+        if not os.path.isdir('data'):
+            os.mkdir('data')
         pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
 
     for name in todolist_names:
