@@ -6,6 +6,9 @@ import pickle
 import discord
 import random
 from discord.ext.commands import Bot
+import re
+import parsedatetime
+import time
 
 NO_TODOS = "🎉 No todos 🎉"
 DEFAULT_LIST = "todo"
@@ -17,9 +20,24 @@ async def get_message(message_id: int, channel_id: int):
 class Todo:
     def __init__(self, message):
         self.text: str = get_todo_text(message.content)
-        self.message_id: int = message.id
         self.url: str = message.jump_url
-        self.display_date: int = None
+        self.display_date: time.struct_time = None
+
+        # find all contents of square brackets
+        metadata = []
+        for string in re.findall('\[(.+?)\]', message.content):
+            metadata += string.split(";")
+
+        for item in metadata:
+            item = item.strip()
+
+            if item.startswith("start:"):
+                datestr = item.removeprefix('start:')
+                cal = parsedatetime.Calendar()
+                parsed_date, is_date = cal.parse(datestr)
+                if is_date == 1:
+                    self.display_date = parsed_date
+
 
     def __repr__(self) -> str:
         return f"<Message: {self.text}, URL: {self.url}>"
@@ -29,6 +47,11 @@ class Todo:
 
     def update(self, message):
         self.text = get_todo_text(message.content)
+        #TODO: update date
+
+    def current(self) -> bool:
+        return not self.display_date or self.display_date < time.localtime()
+
 
 
 class TodoList:
@@ -68,7 +91,8 @@ class TodoList:
     def pretty_print(self) -> str:
         todo_str_list = ""
         for todo in self.todos.values():
-            todo_str_list = todo_str_list + todo.compose_line()
+            if todo.current():
+                todo_str_list = todo_str_list + todo.compose_line()
 
         return todo_str_list
 
@@ -158,8 +182,13 @@ async def rand(context, *args):
     else: #TODO: take multiple lists
         list_name = args[0]
 
-    if len(user_todolists[list_name].todos) != 0:
-        random_todo = random.choice(__builtins__.list(user_todolists[list_name].todos.values()))
+    curr_list = user_todolists[list_name]
+
+    if len(curr_list.todos) != 0 or not curr_list.pretty_print() == "": # yes this is a dumb way to check if we have any current todos, why do you ask?
+        random_todo = random.choice(__builtins__.list(curr_list.todos.values()))
+        while not random_todo.current():
+            random_todo = random.choice(__builtins__.list(curr_list.todos.values()))
+
         await context.message.channel.send(random_todo.compose_line())
     else:
         await context.message.channel.send(NO_TODOS)
@@ -228,11 +257,14 @@ def get_list_name(message) -> str:
 
     return DEFAULT_LIST # if does not exist, assume we are just writing a colon
 
-# assumes format "-- [list_name:] todo text"
+# assumes format "-- list_name: todo text [metadata to remove]"
 def get_todo_text(todo: str) -> str:
+    todo = re.sub('(\[.+?\])', "", todo) # note: removes *all* content of square brackets, even non-accepted metadata formats
     return todo[2:].strip()
 
 def get_list_of_lists():
     return pickle.load(open(todolist_names_file, 'rb'))
+
+
 
 rusabot.run(BOT_TOKEN)
