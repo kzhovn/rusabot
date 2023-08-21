@@ -16,15 +16,19 @@ async def get_message(message_id: int, channel_id: int):
 
 class Todo:
     def __init__(self, message):
-        self.text: str = message.content[2:].strip()
+        self.text: str = get_todo_text(message.content)
         self.message_id: int = message.id
         self.url: str = message.jump_url
+        self.display_date: int = None
 
     def __repr__(self) -> str:
-        return f"<Message: {self.text}, ID: {self.message_id}>"
+        return f"<Message: {self.text}, URL: {self.url}>"
 
     def compose_line(self):
         return f"- {self.text} ({self.url})\n"
+
+    def update(self, message):
+        self.text = get_todo_text(message.content)
 
 
 class TodoList:
@@ -33,7 +37,6 @@ class TodoList:
         self.todos: dict = {} # id int -> Todo
         self.last_list_id: int = None
         self.last_list_channel: int = None
-
 
     def get_file_name(self) -> str:
         return f'data/{self.name}.pkl'
@@ -81,6 +84,9 @@ class TodoList:
         self.last_list_id = new_list.id
         self.last_list_channel = context.message.channel.id
 
+    def update_todo(self, message):
+        # TODO: update line in print?
+        self.todos[message.id].update(message)
 
     def __repr__(self) -> str:
         return f'Todos for list {self.name}: {self.todos}\n'
@@ -113,10 +119,15 @@ async def on_ready():
 @rusabot.event
 async def on_message(message):
     if is_todo(message):
-        print(get_list_name(message))
         user_todolists[get_list_name(message)].add_todo(message)
 
     await rusabot.process_commands(message)
+
+@rusabot.event
+async def on_message_edit(before, after):
+    if is_todo(before) and is_todo(after):
+        # does not allow for changing list
+        user_todolists[get_list_name(after)].update_todo(after)
 
 @rusabot.event #check every new reaction (on_reaction_add only looks into cache)
 async def on_raw_reaction_add(payload):
@@ -207,22 +218,18 @@ def get_list_name(message) -> str:
         raise Exception(f"{message.content} is not a todo.")
 
     colon_split_msg = message.content.split(':', 1)
-    print(colon_split_msg)
     if len(colon_split_msg) == 1:
         return DEFAULT_LIST
 
-    first_word = strip_bullet_points(colon_split_msg[0]).strip()
-    print(first_word)
+    first_word = colon_split_msg[0][2:].strip()
     if first_word in get_list_of_lists():
         return first_word
 
     return DEFAULT_LIST # if does not exist, assume we are just writing a colon
 
-def strip_bullet_points(todo: str) -> str:
-    if todo[:2] == "--":
-        return todo[2:].lstrip()
-    else:
-        raise Exception(f"{todo} is not a todo; expected leading '--'")
+# assumes format "-- [list_name:] todo text"
+def get_todo_text(todo: str) -> str:
+    return todo[2:].strip()
 
 def get_list_of_lists():
     return pickle.load(open(todolist_names_file, 'rb'))
