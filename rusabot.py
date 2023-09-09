@@ -18,7 +18,7 @@ async def get_message(message_id: int, channel_id: int):
     return await rusabot.get_channel(channel_id).fetch_message(message_id)
 
 class Todo:
-    def __init__(self, message):
+    def __init__(self, message: discord.Message):
         self.text: str = get_todo_text(message.content)
         self.url: str = message.jump_url
         self.display_date: time.struct_time = None
@@ -45,17 +45,17 @@ class Todo:
     def compose_line(self):
         return f"- {self.text} ({self.url})\n"
 
-    def update(self, message):
+    def update(self, message:discord.Message):
         self.text = get_todo_text(message.content)
+        print("Updated " + self.text)
         #TODO: update date
 
     def current(self) -> bool:
         return not self.display_date or self.display_date < time.localtime()
 
 
-
 class TodoList:
-    def __init__(self, name : str = None):
+    def __init__(self, name: str = None):
         self.name: str = name
         self.todos: dict = {} # id int -> Todo
         self.last_list_id: int = None
@@ -72,23 +72,30 @@ class TodoList:
         print("Adding " + self.todos[message.id].text)
 
     async def remove_todo(self, message: discord.Message):
-        todo = self.todos[message.id]
-        if self.todos.pop(message.id, None):
-            print("Removing " + todo.text)
-            self.pkl()
-
-            if self.last_list_id:
-                message = await get_message(self.last_list_id, self.last_list_channel)
-                new_message_content = ""
-                for line in message.content.splitlines(keepends = True):
-                    if line.strip() == todo.compose_line().strip():
-                        new_message_content += ("- ~~" + line[1:].strip() + "~~\n")
-                    else:
-                        new_message_content += (line)
-
-                await message.edit(content=new_message_content, suppress=True)
-        else:
+        if not await self.remove_todo_by_id(message.id):
             print(f"{message} was not a todo")
+
+    # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
+    async def remove_todo_by_id(self, id: int) -> bool:
+        todo = self.todos[id]
+        if not self.todos.pop(id, None):
+            return False
+
+        print("Removing " + todo.text)
+        self.pkl()
+
+        if self.last_list_id:
+            last_list = await get_message(self.last_list_id, self.last_list_channel)
+            new_message_content = ""
+            for line in last_list.content.splitlines(keepends = True):
+                if line.strip() == todo.compose_line().strip():
+                    new_message_content += ("- ~~" + line[1:].strip() + "~~\n")
+                else:
+                    new_message_content += (line)
+
+            await last_list.edit(content=new_message_content, suppress=True)
+
+        return True
 
     def pretty_print(self) -> str:
         todo_str_list = ""
@@ -101,7 +108,7 @@ class TodoList:
     def pkl(self):
         pickle.dump(self, open(self.get_file_name(), 'wb'))
 
-    async def print_list_to_channel(self, context) -> None:
+    async def print_list_to_channel(self, context):
         if len(self.todos) == 0:
             await context.message.channel.send(NO_TODOS)
             return
@@ -110,17 +117,20 @@ class TodoList:
         self.last_list_id = new_list.id
         self.last_list_channel = context.message.channel.id
 
-    def update_todo(self, message):
+    def update_todo(self, message: discord.Message):
         # TODO: update line in print?
         self.todos[message.id].update(message)
         self.pkl()
+
+    def has_message(self, message: discord.Message) -> bool:
+        return message.id in self.todos.keys()
 
     def __repr__(self) -> str:
         return f'Todos for list {self.name}: {self.todos}\n'
 
 
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
-user_todolists = {}
+user_todolists = {} # {name: TodoList}
 todolist_names_file = 'data/todolist_names.pkl'
 
 @rusabot.event
@@ -140,26 +150,41 @@ async def on_ready():
             print(f'List {name} not found, creating.')
             user_todolists[name] = (TodoList(name))
 
-    print(user_todolists)
-
     print("rusabot online")
 
 #https://stackoverflow.com/questions/49331096/why-does-on-message-stop-commands-from-working
 @rusabot.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     if is_todo(message):
         user_todolists[get_list_name(message)].add_todo(message)
 
     await rusabot.process_commands(message)
 
 @rusabot.event
-async def on_message_edit(before, after):
-    if is_todo(before) and is_todo(after):
-        # does not allow for changing list
+async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
+    after = await get_message(payload.message_id, payload.channel_id)
+    if not is_todo(after):
+        # TODO: clean up somehow
+        return
+    
+    if user_todolists[get_list_name(after)].has_message(after):
+        print("In list")
         user_todolists[get_list_name(after)].update_todo(after)
+    else: # update list
+        print("Changing message list")
+        if payload.cached_message:
+            before = payload.cached_message
+            await user_todolists[get_list_name(before)].remove_todo(before)
+        else: # handle case where old message isn't available
+            for lst in user_todolists.values():
+                if await lst.remove_todo_by_id(payload.message_id):
+                    break
+
+        user_todolists[get_list_name(after)].add_todo(after)
+
 
 @rusabot.event #check every new reaction (on_reaction_add only looks into cache)
-async def on_raw_reaction_add(payload):
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     message = await get_message(payload.message_id, payload.channel_id)
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
         await user_todolists[get_list_name(message)].remove_todo(message)
@@ -169,7 +194,7 @@ async def on_raw_reaction_add(payload):
 
 # print current todos in channel
 @rusabot.command()
-async def list(context, *args):
+async def list(context, *args): # yes this name is a crime but I do in fact want 'list' and don't know how to do it differently in the code
     if len(args) == 0:
         await user_todolists[DEFAULT_LIST].print_list_to_channel(context)
     elif args[0] == 'all':
@@ -241,13 +266,13 @@ async def removelist(context, *args):
     pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
 
 
-def is_todo(message) -> bool:
+def is_todo(message: discord.Message) -> bool:
     if message.content.startswith("--") and not message.author.bot:
         return True
     else:
         return False
 
-def get_list_name(message) -> str:
+def get_list_name(message: discord.Message) -> str:
     if not is_todo(message):
         raise Exception(f"{message.content} is not a todo.")
 
