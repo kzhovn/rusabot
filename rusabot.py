@@ -81,6 +81,7 @@ class TodoList:
         
         if complete: # send to beeminder
             create_beeminder_datapoint("todo", comment=message.content)
+            await message.add_reaction("🐝")
 
     # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
     async def remove_todo_by_id(self, id: int) -> bool:
