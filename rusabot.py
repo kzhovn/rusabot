@@ -308,8 +308,9 @@ async def beemind(context, *args):
 
 
 # Sends a beeminder datapoint to `goal`; returns true on success and false on failure
-def create_beeminder_datapoint(goal: str, val: float = 1, comment: str = "via rusabot") -> bool:
+def create_beeminder_datapoint(goal: str, val: float = 1, comment: str = "") -> bool:
     pyminder = Pyminder(user = BEEMINDER_USER, token = BEEMINDER_TOKEN)
+    comment = comment + " via rusabot"
     try:
         pyminder._beeminder.create_datapoint(goal, val, comment = comment)
         print(f"Added {val} to beeminder goal '{goal}'.") 
