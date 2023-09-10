@@ -45,7 +45,7 @@ class Todo:
     def compose_line(self):
         return f"- {self.text} ({self.url})\n"
 
-    def update(self, message:discord.Message):
+    def update(self, message: discord.Message):
         self.text = get_todo_text(message.content)
         print("Updated " + self.text)
         #TODO: update date
@@ -113,7 +113,13 @@ class TodoList:
             await context.message.channel.send(NO_TODOS)
             return
 
-        new_list = await context.message.channel.send(self.pretty_print())
+        try:
+            new_list = await context.message.channel.send(self.pretty_print())
+        except:
+            embedVar = discord.Embed(title = self.name, description=self.pretty_print())
+            new_list = await context.message.channel.send(embed=embedVar)
+
+
         self.last_list_id = new_list.id
         self.last_list_channel = context.message.channel.id
 
