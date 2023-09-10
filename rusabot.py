@@ -6,7 +6,6 @@ import pickle
 import discord
 import random
 from discord.ext.commands import Bot
-from discord.ext.commands.errors import CommandInvokeError
 import re
 import parsedatetime
 import time
@@ -302,9 +301,13 @@ async def beemind(context, *args):
         await context.message.channel.send('Too many arguments. You can specify goal name, value, and a comment, e.g. `.beemind teeth 1.5 "flossed today"`')
         return
     
-    create_beeminder_datapoint(goal, val, comment)
+    if create_beeminder_datapoint(goal, val, comment):
+        await context.message.add_reaction("🐝")
+    else:
+        await context.message.add_reaction("❌")
 
 
+# Sends a beeminder datapoint to `goal`; returns true on success and false on failure
 def create_beeminder_datapoint(goal: str, val: float = 1, comment: str = "via rusabot") -> bool:
     pyminder = Pyminder(user = BEEMINDER_USER, token = BEEMINDER_TOKEN)
     try:
