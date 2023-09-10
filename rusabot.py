@@ -1,11 +1,12 @@
 #Docs: https://discordpy.readthedocs.io/en/latest/intro.html
-from bot_token import BOT_TOKEN, BEEMINDER_TOKEN
+from bot_token import BOT_TOKEN, BEEMINDER_TOKEN, BEEMINDER_USER
 
 import os
 import pickle
 import discord
 import random
 from discord.ext.commands import Bot
+from discord.ext.commands.errors import CommandInvokeError
 import re
 import parsedatetime
 import time
@@ -78,10 +79,8 @@ class TodoList:
             print(f"{message} was not a todo")
             return
         
-        if complete: # Send to beeminder
-            pyminder = Pyminder(user = "rusalkii", token = BEEMINDER_TOKEN)
-            pyminder._beeminder.create_datapoint("todo", 1, comment = message.content)
-            print("Added to beeminder goal 'todo'.")          
+        if complete: # send to beeminder
+            create_beeminder_datapoint("todo", comment=message.content)
 
     # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
     async def remove_todo_by_id(self, id: int) -> bool:
@@ -127,7 +126,6 @@ class TodoList:
             embedVar = discord.Embed(title = self.name, description=self.pretty_print())
             new_list = await context.message.channel.send(embed=embedVar)
 
-
         self.last_list_id = new_list.id
         self.last_list_channel = context.message.channel.id
 
@@ -141,7 +139,6 @@ class TodoList:
 
     def __repr__(self) -> str:
         return f'Todos for list {self.name}: {self.todos}\n'
-
 
 rusabot = Bot(command_prefix = ".", intents=discord.Intents.all())
 user_todolists = {} # {name: TodoList}
@@ -282,6 +279,40 @@ async def removelist(context, *args):
             await context.message.channel.send(f"List {name} doesn't exist.")
 
     pickle.dump(todolist_names, open(todolist_names_file, 'wb'))
+
+@rusabot.command()
+async def beemind(context, *args):
+    if len(args) == 0:
+        await context.message.channel.send("Must specify a goal name, e.g. `.beemind teeth`.")
+        return
+    
+    goal = str(args[0])
+    val = 1
+    comment = ""
+
+    if len(args) >= 2:
+        val = float(args[1]) # raise the exceptions sanely
+
+    if len(args) >= 3:
+        comment = str(args[2])
+
+    if len(args) > 3:
+        await context.message.channel.send('Too many arguments. You can specify goal name, value, and a comment, e.g. `.beemind teeth 1.5 "flossed today"`')
+        return
+    
+    create_beeminder_datapoint(goal, val, comment)
+
+
+def create_beeminder_datapoint(goal: str, val: float = 1, comment: str = "via rusabot") -> bool:
+    pyminder = Pyminder(user = BEEMINDER_USER, token = BEEMINDER_TOKEN)
+    try:
+        pyminder._beeminder.create_datapoint(goal, val, comment = comment)
+        print(f"Added {val} to beeminder goal '{goal}'.") 
+        return True     
+    except Exception as e:
+        print(e)
+        return False
+
 
 
 def is_todo(message: discord.Message) -> bool:
