@@ -1,5 +1,5 @@
 #Docs: https://discordpy.readthedocs.io/en/latest/intro.html
-from bot_token import BOT_TOKEN
+from bot_token import BOT_TOKEN, BEEMINDER_TOKEN
 
 import os
 import pickle
@@ -9,6 +9,7 @@ from discord.ext.commands import Bot
 import re
 import parsedatetime
 import time
+from pyminder.pyminder import Pyminder
 
 NO_TODOS = "🎉 No todos 🎉"
 DEFAULT_LIST = "todo"
@@ -62,18 +63,25 @@ class TodoList:
         self.last_list_channel: int = None
 
         self.pkl()
-
-    def get_file_name(self) -> str:
-        return f'data/{self.name}.pkl'
+   
+    @property
+    def file_name(self) -> str:
+        return f"data/{self.name}.pkl"
 
     def add_todo(self, message: discord.Message):
         self.todos[message.id] = Todo(message)
         self.pkl()
         print("Adding " + self.todos[message.id].text)
 
-    async def remove_todo(self, message: discord.Message):
+    async def remove_todo(self, message: discord.Message, complete: bool = False):
         if not await self.remove_todo_by_id(message.id):
             print(f"{message} was not a todo")
+            return
+        
+        if complete: # Send to beeminder
+            pyminder = Pyminder(user = "rusalkii", token = BEEMINDER_TOKEN)
+            pyminder._beeminder.create_datapoint("todo", 1, comment = message.content)
+            print("Added to beeminder goal 'todo'.")          
 
     # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
     async def remove_todo_by_id(self, id: int) -> bool:
@@ -106,7 +114,7 @@ class TodoList:
         return todo_str_list
 
     def pkl(self):
-        pickle.dump(self, open(self.get_file_name(), 'wb'))
+        pickle.dump(self, open(self.file_name, 'wb'))
 
     async def print_list_to_channel(self, context):
         if len(self.todos) == 0:
@@ -193,7 +201,11 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     message = await get_message(payload.message_id, payload.channel_id)
     if (payload.emoji.name == "✅" or payload.emoji.name == "❌") and is_todo(message):
-        await user_todolists[get_list_name(message)].remove_todo(message)
+        if payload.emoji.name == "✅":
+            complete = True
+        elif payload.emoji.name == "❌":
+            complete = False
+        await user_todolists[get_list_name(message)].remove_todo(message, complete)
 
     if message.author == rusabot.user and payload.emoji.name == "❌":
         await message.delete()
