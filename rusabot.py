@@ -274,6 +274,7 @@ async def removelist(context, *args):
         if name == DEFAULT_LIST:
             await context.message.channel.send(f"Cannot delete default list '{DEFAULT_LIST}'.")
         elif name in todolist_names:
+            os.remove(user_todolists[name].file_name)
             todolist_names.remove(name)
             print(f'Removing list {name}')
         else:
