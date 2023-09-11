@@ -6,6 +6,8 @@ class Beeminder(commands.Cog):
 
     @commands.command()
     async def beemind(self, context, *args):
+        """Send a datapoint to beeminder. 
+        Usage example: `.beemind teeth 1.5 flossed`. Only goal argument is required."""
         if len(args) == 0:
             await context.message.channel.send("Must specify a goal name, e.g. `.beemind teeth`.")
             return

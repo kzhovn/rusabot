@@ -34,7 +34,6 @@ class Todo:
                 if is_date == 1:
                     self.display_date = parsed_date
 
-
     def __repr__(self) -> str:
         return f"<Message: {self.text}, URL: {self.url}>"
 
@@ -53,12 +52,15 @@ class Todo:
 class TodoList:
     def __init__(self, name: str = None):
         self.name: str = name
-        self.todos: dict = {} # id int -> Todo
+        self.todos: dict[int, Todo] = {} # id int -> Todo
         self.last_list_id: int = None
         self.last_list_channel: int = None
 
         self.pkl()
    
+    def __repr__(self) -> str:
+        return f'Todos for list {self.name}: {self.todos}\n'
+
     @property
     def file_name(self) -> str:
         return f"data/{self.name}.pkl"
@@ -111,9 +113,6 @@ class TodoList:
 
         return todo_str_list
 
-    def pkl(self):
-        pickle.dump(self, open(self.file_name, 'wb'))
-
     async def print_list_to_channel(self, context):
         if len(self.todos) == 0:
             await context.message.channel.send(NO_TODOS)
@@ -133,27 +132,18 @@ class TodoList:
         self.todos[message.id].update(message)
         self.pkl()
 
+    def pkl(self):
+        pickle.dump(self, open(self.file_name, 'wb'))
+
     def has_message(self, message: discord.Message) -> bool:
         return message.id in self.todos.keys()
-
-    def __repr__(self) -> str:
-        return f'Todos for list {self.name}: {self.todos}\n'
-    
-    # def __getstate__(self):
-    #     state = self.__dict__.copy()
-    #     del state["bot"]
-    #     return state
-    
-    # def __setstate__(self, state, bot):
-    #     self.__dict__.update(state)
-    #     self.bot = bot
 
 
 class TodoCog(commands.Cog):
     def __init__(self, bot: Bot, todolist_names_file: str):
         self.bot: Bot = bot
         self.todolist_names_file: str = todolist_names_file
-        self.user_todolists: dict = {}
+        self.user_todolists: dict[str, TodoList] = {}
 
         if os.path.isfile(todolist_names_file):
             todolist_names = self.get_list_of_lists()
@@ -165,10 +155,10 @@ class TodoCog(commands.Cog):
 
         for name in todolist_names:
             if os.path.isfile(f'data/{name}.pkl'):
-                self.user_todolists[name] = (pickle.load(open(f'data/{name}.pkl', 'rb')))
+                self.user_todolists[name] = pickle.load(open(f'data/{name}.pkl', 'rb'))
             else:
                 print(f'List {name} not found, creating.')
-                self.user_todolists[name] = (TodoList(name))
+                self.user_todolists[name] = TodoList(name)
 
 
     async def get_message(self, message_id: int, channel_id: int):
@@ -231,8 +221,8 @@ class TodoCog(commands.Cog):
         if message.author == self.bot.user and payload.emoji.name == "❌":
             await message.delete()
 
-    @commands.command()
-    async def list(self, context, *args): # yes this name is a crime but I do in fact want 'list' and don't know how to do it differently in the code
+    @commands.command(name="list")
+    async def list_todos(self, context, *args): # yes this name is a crime but I do in fact want 'list' and don't know how to do it differently in the code
         """Prints current todos to channel"""
         if len(args) == 0:
             await self.user_todolists[DEFAULT_LIST].print_list_to_channel(context)
@@ -263,6 +253,7 @@ class TodoCog(commands.Cog):
 
     @commands.command()
     async def newlist(self, context, *args):
+        """Creates a new todolist named in the first arg. """
         if len(args) == 0:
             await context.message.channel.send("Must specify a name for the list, e.g. `.newlist work`.")
             return
@@ -288,6 +279,7 @@ class TodoCog(commands.Cog):
 
     @commands.command()
     async def removelist(self, context, *args):
+        """Deletes the list(s) passed to the command. WARNING: deletes data. """
         if len(args) == 0:
             await context.message.channel.send("Must specify at least one name for the list(s) to be removed, e.g. `.removelist work`.")
             return
@@ -306,6 +298,8 @@ class TodoCog(commands.Cog):
         pickle.dump(todolist_names, open(self.todolist_names_file, 'wb'))
 
 
+
+### Utils ###
 
 def is_todo(message: discord.Message) -> bool:
     if message.content.startswith("--") and not message.author.bot:
