@@ -146,7 +146,7 @@ class TodoCog(commands.Cog):
         self.user_todolists: dict[str, TodoList] = {}
 
         if os.path.isfile(todolist_names_file):
-            todolist_names = self.get_list_of_lists()
+            todolist_names = self.get_todolist_names()
         else: # if we're new, just use the default list
             todolist_names = [DEFAULT_LIST]
             if not os.path.isdir('data'):
@@ -164,7 +164,7 @@ class TodoCog(commands.Cog):
     async def get_message(self, message_id: int, channel_id: int):
         return await self.bot.get_channel(channel_id).fetch_message(message_id)
 
-    def get_list_of_lists(self):
+    def get_todolist_names(self) -> list[str]:
         return pickle.load(open(self.todolist_names_file, 'rb'))
     
     def get_list_name(self, message: discord.Message) -> str:
@@ -176,7 +176,7 @@ class TodoCog(commands.Cog):
             return DEFAULT_LIST
 
         first_word = colon_split_msg[0][2:].strip()
-        if first_word in self.get_list_of_lists():
+        if first_word in self.get_todolist_names():
             return first_word
 
         return DEFAULT_LIST # if does not exist, assume we are just writing a colon
@@ -222,24 +222,18 @@ class TodoCog(commands.Cog):
             await message.delete()
 
     @commands.command(name="list")
-    async def list_todos(self, context, *args): # yes this name is a crime but I do in fact want 'list' and don't know how to do it differently in the code
+    async def list_todos(self, context, lst: str = DEFAULT_LIST): # yes this name is a crime but I do in fact want 'list' and don't know how to do it differently in the code
         """Prints current todos to channel"""
-        if len(args) == 0:
-            await self.user_todolists[DEFAULT_LIST].print_list_to_channel(context)
-        elif args[0] == 'all':
+        if lst == 'all':
             for todolist in self.user_todolists.values():
                 await todolist.print_list_to_channel(context)
         else:
-            await self.user_todolists[args[0]].print_list_to_channel(context)
+            await self.user_todolists[lst].print_list_to_channel(context)
 
     @commands.command()
-    async def rand(self, context, *args):
+    async def rand(self, context, lst: str = DEFAULT_LIST):
         """ Prints a random todo item to channel"""
-        if len(args) == 0:
-            list_name = DEFAULT_LIST
-        else: #TODO: take multiple lists
-            list_name = args[0]
-
+        list_name = lst #TODO: take multiple lists
         curr_list = self.user_todolists[list_name]
 
         if len(curr_list.todos) != 0 or not curr_list.pretty_print() == "": # yes this is a dumb way to check if we have any current todos, why do you ask?
@@ -252,17 +246,16 @@ class TodoCog(commands.Cog):
             await context.message.channel.send(NO_TODOS)
 
     @commands.command()
-    async def newlist(self, context, *args):
-        """Creates a new todolist named in the first arg. """
-        if len(args) == 0:
-            await context.message.channel.send("Must specify a name for the list, e.g. `.newlist work`.")
-            return
-        if len(args) > 1:
-            await context.message.channel.send("List name must be one word, no spaces permitted, e.g. `.newlist work`.")
-            return
+    async def newlist(self, context, name: str):
+        """Creates a new todolist named name. """
+        # if name is None:
+        #     await context.message.channel.send("Must specify a name for the list, e.g. `.newlist work`.")
+        #     return
+        # if len(args) > 1:
+        #     await context.message.channel.send("List name must be one word, no spaces permitted, e.g. `.newlist work`.")
+        #     return
 
-        todolist_names = self.get_list_of_lists()
-        name = args[0]
+        todolist_names = self.get_todolist_names()
 
         if name in todolist_names:
             await context.message.channel.send("List name already in use, try another one.")
@@ -278,14 +271,14 @@ class TodoCog(commands.Cog):
             print(f'Created list {name}')
 
     @commands.command()
-    async def removelist(self, context, *args):
+    async def removelist(self, context, *lsts: list[str]):
         """Deletes the list(s) passed to the command. WARNING: deletes data. """
-        if len(args) == 0:
+        if len(lsts) == 0:
             await context.message.channel.send("Must specify at least one name for the list(s) to be removed, e.g. `.removelist work`.")
             return
 
-        todolist_names = self.get_list_of_lists()
-        for name in args:
+        todolist_names = self.get_todolist_names()
+        for name in lsts:
             if name == DEFAULT_LIST:
                 await context.message.channel.send(f"Cannot delete default list '{DEFAULT_LIST}'.")
             elif name in todolist_names:

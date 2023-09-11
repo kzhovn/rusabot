@@ -5,27 +5,8 @@ from bot_token import BEEMINDER_TOKEN, BEEMINDER_USER
 class Beeminder(commands.Cog):
 
     @commands.command()
-    async def beemind(self, context, *args):
-        """Send a datapoint to beeminder. 
-        Usage example: `.beemind teeth 1.5 flossed`. Only goal argument is required."""
-        if len(args) == 0:
-            await context.message.channel.send("Must specify a goal name, e.g. `.beemind teeth`.")
-            return
-        
-        goal = str(args[0])
-        val = 1
-        comment = ""
-
-        if len(args) >= 2:
-            val = float(args[1]) # raise the exceptions sanely
-
-        if len(args) >= 3:
-            comment = str(args[2])
-
-        if len(args) > 3:
-            await context.message.channel.send('Too many arguments. You can specify goal name, value, and a comment, e.g. `.beemind teeth 1.5 "flossed today"`')
-            return
-        
+    async def beemind(self, context, goal, val: float = 1, comment: str = ""):
+        """Send a datapoint to beeminder. Usage example: `.beemind teeth 1.5 flossed`."""
         if create_beeminder_datapoint(goal, val, comment):
             await context.message.add_reaction("🐝")
         else:
