@@ -266,7 +266,7 @@ class TodoCog(commands.Cog):
             print(f'Created list {name}')
 
     @commands.command()
-    async def removelist(self, context, *lsts: list[str]):
+    async def removelist(self, context, *lsts: str):
         """Deletes the list(s) passed to the command. WARNING: deletes data. """
         if len(lsts) == 0:
             await context.message.channel.send("Must specify at least one name for the list(s) to be removed, e.g. `.removelist work`.")
