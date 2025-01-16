@@ -6,7 +6,6 @@ import os
 import re
 import time
 import parsedatetime
-from beeminder import create_beeminder_datapoint
 from discord.ext.commands import Bot
 
 
@@ -57,7 +56,7 @@ class TodoList:
         self.last_list_channel: int = None
 
         self.pkl()
-   
+
     def __repr__(self) -> str:
         return f'Todos for list {self.name}: {self.todos}\n'
 
@@ -75,10 +74,6 @@ class TodoList:
         if not await self.remove_todo_by_id(bot, message.id):
             print(f"{message} was not a todo")
             return
-        
-        if complete: # send to beeminder
-            create_beeminder_datapoint("todo", comment=message.content)
-            await message.add_reaction("🐝")
 
     # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
     async def remove_todo_by_id(self, bot: Bot, id: int) -> bool:
@@ -104,7 +99,7 @@ class TodoList:
 
     async def get_last_list(self, bot: Bot):
         return await bot.get_channel(self.last_list_channel).fetch_message(self.last_list_id)
-    
+
     def pretty_print(self) -> str:
         todo_str_list = ""
         for todo in self.todos.values():
@@ -166,7 +161,7 @@ class TodoCog(commands.Cog):
 
     def get_todolist_names(self) -> list[str]:
         return pickle.load(open(self.todolist_names_file, 'rb'))
-    
+
     def get_list_name(self, message: discord.Message) -> str:
         if not is_todo(message):
             raise Exception(f"{message.content} is not a todo.")
@@ -192,7 +187,7 @@ class TodoCog(commands.Cog):
         if not is_todo(after):
             # TODO: clean up somehow
             return
-        
+
         if self.user_todolists[self.get_list_name(after)].has_message(after):
             print("In list")
             self.user_todolists[self.get_list_name(after)].update_todo(after)
@@ -301,7 +296,7 @@ def is_todo(message: discord.Message) -> bool:
         return False
 
 def get_todo_text(todo: str) -> str:
-    """ Returns clean todo text with dashes and metadata stripped. 
+    """ Returns clean todo text with dashes and metadata stripped.
     Assumes format '-- list_name: todo text [metadata to remove]' """
     todo = re.sub('(\[.+?\])', "", todo) # note: removes *all* content of square brackets, even non-accepted metadata formats
     return todo[2:].strip()
