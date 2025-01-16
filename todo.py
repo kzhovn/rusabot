@@ -8,6 +8,10 @@ import time
 import parsedatetime
 from discord.ext.commands import Bot
 
+import asyncio
+import datetime
+from typing import Optional
+
 
 NO_TODOS = "🎉 No todos 🎉"
 DEFAULT_LIST = "todo"
@@ -140,6 +144,10 @@ class TodoCog(commands.Cog):
         self.todolist_names_file: str = todolist_names_file
         self.user_todolists: dict[str, TodoList] = {}
 
+        self.daily_list = DailyTodoList()
+        self.user_todolists["daily"] = self.daily_list
+        self.bg_task = self.bot.loop.create_task(self.schedule_daily_reset())
+
         if os.path.isfile(todolist_names_file):
             todolist_names = self.get_todolist_names()
         else: # if we're new, just use the default list
@@ -171,10 +179,30 @@ class TodoCog(commands.Cog):
             return DEFAULT_LIST
 
         first_word = colon_split_msg[0][2:].strip()
+        if first_word == "daily":  # We don't manually init dailt
+            return "daily"
         if first_word in self.get_todolist_names():
             return first_word
 
         return DEFAULT_LIST # if does not exist, assume we are just writing a colon
+
+    async def schedule_daily_reset(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            now = datetime.datetime.now()
+            # Calculate time until next 4 AM
+            if now.hour >= 4:
+                next_run = now + datetime.timedelta(days=1)
+            else:
+                next_run = now
+            next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+
+            # Sleep until next run time
+            delay = (next_run - now).total_seconds()
+            await asyncio.sleep(delay)
+
+            # Reset daily tasks
+            await self.daily_list.reset_daily_tasks()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -285,6 +313,64 @@ class TodoCog(commands.Cog):
 
         pickle.dump(todolist_names, open(self.todolist_names_file, 'wb'))
 
+    @commands.command()
+    async def daily(self, context):
+        """Shows the daily todo list. Add items with --daily: task [repeat:daily/monday,wednesday/friday]"""
+        await self.daily_list.print_list_to_channel(context)
+
+
+### Daily ###
+
+class DailyTodo(Todo):
+    def __init__(self, message: discord.Message):
+        super().__init__(message)
+        self.repeat_schedule: Optional[str] = None
+
+        # Parse metadata for repeat schedule
+        metadata = []
+        for string in re.findall('\[(.+?)\]', message.content):
+            metadata += string.split(";")
+
+        for item in metadata:
+            item = item.strip()
+            if item.startswith("repeat:"):
+                self.repeat_schedule = item.removeprefix('repeat:').strip()
+
+    def should_repeat(self) -> bool:
+        if not self.repeat_schedule:
+            return False
+
+        today = datetime.datetime.now().strftime("%A").lower()
+        if self.repeat_schedule == "daily":
+            return True
+        elif "," in self.repeat_schedule:
+            days = [day.strip().lower() for day in self.repeat_schedule.split(",")]
+            return today in days
+        else:
+            return today == self.repeat_schedule.lower()
+
+class DailyTodoList(TodoList):
+    def __init__(self, name: str = "daily"):
+        super().__init__(name)
+        self.repeating_todos: dict[int, DailyTodo] = {}
+
+    def add_todo(self, message: discord.Message):
+        todo = DailyTodo(message)
+        if todo.repeat_schedule:
+            self.repeating_todos[message.id] = todo
+        self.todos[message.id] = todo
+        self.pkl()
+        print(f"Adding {'repeating ' if todo.repeat_schedule else ''}{todo.text}")
+
+    async def reset_daily_tasks(self):
+        # Clear non-repeating todos
+        self.todos = {k: v for k, v in self.todos.items() if k in self.repeating_todos}
+
+        # Filter out repeating todos that shouldn't show today
+        self.todos = {k: v for k, v in self.todos.items()
+                     if k not in self.repeating_todos or self.repeating_todos[k].should_repeat()}
+
+        self.pkl()
 
 
 ### Utils ###
