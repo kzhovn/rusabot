@@ -146,7 +146,7 @@ class TodoCog(commands.Cog):
 
         self.daily_list = DailyTodoList()
         self.user_todolists["daily"] = self.daily_list
-        self.bg_task = self.bot.loop.create_task(self.schedule_daily_reset())
+        self._daily_task = None
 
         if os.path.isfile(todolist_names_file):
             todolist_names = self.get_todolist_names()
@@ -162,7 +162,6 @@ class TodoCog(commands.Cog):
             else:
                 print(f'List {name} not found, creating.')
                 self.user_todolists[name] = TodoList(name)
-
 
     async def get_message(self, message_id: int, channel_id: int):
         return await self.bot.get_channel(channel_id).fetch_message(message_id)
@@ -186,23 +185,45 @@ class TodoCog(commands.Cog):
 
         return DEFAULT_LIST # if does not exist, assume we are just writing a colon
 
+    async def cog_load(self):
+        # Start the background task when the cog is loaded
+        self._daily_task = self.bot.loop.create_task(self.schedule_daily_reset())
+
+    async def cog_unload(self):
+        # Cleanup the task when the cog is unloaded
+        if self._daily_task:
+            self._daily_task.cancel()
+
     async def schedule_daily_reset(self):
         await self.bot.wait_until_ready()
-        while not self.bot.is_closed():
-            now = datetime.datetime.now()
-            # Calculate time until next 4 AM
-            if now.hour >= 4:
-                next_run = now + datetime.timedelta(days=1)
-            else:
-                next_run = now
-            next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+        while True:
+            try:
+                now = datetime.datetime.now()
+                # Calculate time until next 4 AM
+                if now.hour >= 4:
+                    next_run = now + datetime.timedelta(days=1)
+                else:
+                    next_run = now
+                next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
 
-            # Sleep until next run time
-            delay = (next_run - now).total_seconds()
-            await asyncio.sleep(delay)
+                # Sleep until next run time
+                delay = (next_run - now).total_seconds()
+                await asyncio.sleep(delay)
 
-            # Reset daily tasks
-            await self.daily_list.reset_daily_tasks()
+                # Reset daily tasks
+                await self.daily_list.reset_daily_tasks()
+
+                # Log successful reset
+                print(f"Daily tasks reset at {datetime.datetime.now()}")
+
+            except asyncio.CancelledError:
+                # Handle proper cancellation
+                raise
+            except Exception as e:
+                # Log the error but don't let the loop die
+                print(f"Error in daily reset task: {e}")
+                # Wait a bit before retrying
+                await asyncio.sleep(60)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
