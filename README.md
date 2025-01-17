@@ -11,5 +11,4 @@ To remove a todo, react to the initial todo message, with ✅ or ❌. ❌ will a
 * `.rand [name]`: gives you a random todo from the given list; if no name is given uses the default list
 * `.newlist [name]`: creates a new list with the given name. Names must be one word, no spaces, and 'todo' and 'all' are reserved.
 * `.removelist [name]`: deletes the list will the given name. *Will* delete your data.
-
-* `.beemind [goalname] [val] [comment]`: sends a datapoint to beeminder. Value and comment are optional; value defaults to 1.
+* `.daily`: displays the daily list. To add a repeating todo to this list, send `--daily: text [repeat:daily/monday/etc]`. To add a nonreapating todo, which will vanish at 4am, send `--daily: text`.
