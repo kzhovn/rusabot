@@ -108,7 +108,13 @@ class TodoList:
         todo_str_list = ""
         for todo in self.todos.values():
             if todo.current():
-                todo_str_list = todo_str_list + todo.compose_line()
+                new_line = todo.compose_line()
+
+                for start in ["- daily:", "- d:"]: # for special lists, don't redundantly repeat list name
+                    if new_line.startswith(start):
+                        new_line = new_line.strip(" ").replace(start, "- ", 1) # remove first occurance
+
+                todo_str_list = todo_str_list + new_line
 
         return todo_str_list
 
@@ -144,10 +150,7 @@ class TodoCog(commands.Cog):
         self.todolist_names_file: str = todolist_names_file
         self.user_todolists: dict[str, TodoList] = {}
 
-        self.daily_list = DailyTodoList()
-        self.user_todolists["daily"] = self.daily_list
-        self._daily_task = None
-
+        # Load normal lists or create if not found
         if os.path.isfile(todolist_names_file):
             todolist_names = self.get_todolist_names()
         else: # if we're new, just use the default list
@@ -162,6 +165,17 @@ class TodoCog(commands.Cog):
             else:
                 print(f'List {name} not found, creating.')
                 self.user_todolists[name] = TodoList(name)
+
+        # Load daily list or create if not found
+        if os.path.isfile('data/daily.pkl'):
+            self.daily_list = pickle.load(open(f'data/daily.pkl', 'rb'))
+        else:
+            print(f'Daily list not found, creating.')
+            self.daily_list = DailyTodoList()
+
+        self.user_todolists["daily"] = self.daily_list
+        self._daily_task = None
+
 
     async def get_message(self, message_id: int, channel_id: int):
         return await self.bot.get_channel(channel_id).fetch_message(message_id)
@@ -178,7 +192,7 @@ class TodoCog(commands.Cog):
             return DEFAULT_LIST
 
         first_word = colon_split_msg[0][2:].strip()
-        if first_word == "daily":  # We don't manually init dailt
+        if first_word == "daily" or first_word == "d":  # We don't manually init dailt
             return "daily"
         if first_word in self.get_todolist_names():
             return first_word
@@ -292,12 +306,6 @@ class TodoCog(commands.Cog):
     @commands.command()
     async def newlist(self, context, name: str):
         """Creates a new todolist named name. """
-        # if name is None:
-        #     await context.message.channel.send("Must specify a name for the list, e.g. `.newlist work`.")
-        #     return
-        # if len(args) > 1:
-        #     await context.message.channel.send("List name must be one word, no spaces permitted, e.g. `.newlist work`.")
-        #     return
 
         todolist_names = self.get_todolist_names()
 
