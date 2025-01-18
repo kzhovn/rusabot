@@ -309,10 +309,12 @@ class TodoCog(commands.Cog):
 
         todolist_names = self.get_todolist_names()
 
+        for name in ['all', 'daily', 'd']:
+            await context.message.channel.send(f"List name '{name}' is reserved.")
+            return
+
         if name in todolist_names:
             await context.message.channel.send("List name already in use, try another one.")
-        elif name == 'all':
-            await context.message.channel.send("List name 'all' is reserved.")
         else:
             todolist_names.append(name)
             pickle.dump(todolist_names, open(self.todolist_names_file, 'wb'))
