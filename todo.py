@@ -75,6 +75,10 @@ class TodoList:
 
     # don't like passing bot here but it doesn't pickle so I don't have a great solution
     async def remove_todo(self, bot: Bot, message: discord.Message, complete: bool = False):
+        if complete:
+            with open('data/log.csv', 'a') as log:
+                log.write(f"{datetime.datetime.now()}, {get_todo_text(message.content)}, {self.name}\n")
+
         if not await self.remove_todo_by_id(bot, message.id):
             print(f"{message} was not a todo")
             return
@@ -82,8 +86,7 @@ class TodoList:
     # Returns False if a todo with this id does not exist in the list and True if sucessfully removed
     async def remove_todo_by_id(self, bot: Bot, id: int) -> bool:
         todo = self.todos[id]
-        if not self.todos.pop(id, None):
-            return False
+        self.todos.pop(id, None)
 
         print("Removing " + todo.text)
         self.pkl()
@@ -176,6 +179,12 @@ class TodoCog(commands.Cog):
         self.user_todolists["daily"] = self.daily_list
         self._daily_task = None
 
+        # Init log file if not found
+        if not os.path.isfile('data/log.csv'):
+            with open('data/log.csv', 'w') as log:
+                log.write(f"timestamp, todo, todolist\n")
+
+
 
     async def get_message(self, message_id: int, channel_id: int):
         return await self.bot.get_channel(channel_id).fetch_message(message_id)
@@ -188,10 +197,10 @@ class TodoCog(commands.Cog):
             raise Exception(f"{message.content} is not a todo.")
 
         colon_split_msg = message.content.split(':', 1)
-        if len(colon_split_msg) == 1:
+        if len(colon_split_msg) == 1: # if no list name given, this is the default list
             return DEFAULT_LIST
 
-        first_word = colon_split_msg[0][2:].strip()
+        first_word = colon_split_msg[0].replace("--", "", 1).strip()
         if first_word == "daily" or first_word == "d":  # We don't manually init dailt
             return "daily"
         if first_word in self.get_todolist_names():
@@ -309,9 +318,10 @@ class TodoCog(commands.Cog):
 
         todolist_names = self.get_todolist_names()
 
-        for name in ['all', 'daily', 'd']:
-            await context.message.channel.send(f"List name '{name}' is reserved.")
-            return
+        for reserved in ['all', 'daily', 'd']:
+            if name == reserved:
+                await context.message.channel.send(f"List name '{name}' is reserved.")
+                return
 
         if name in todolist_names:
             await context.message.channel.send("List name already in use, try another one.")
