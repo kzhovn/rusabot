@@ -333,9 +333,12 @@ class TodoCog(commands.Cog):
 
         todolist_names = self.get_todolist_names()
         for name in lsts:
-            if name == DEFAULT_LIST:
-                await context.message.channel.send(f"Cannot delete default list '{DEFAULT_LIST}'.")
-            elif name in todolist_names:
+            for reserved in ['daily', DEFAULT_LIST]:
+                if name == reserved:
+                    await context.message.channel.send(f"Cannot delete reserved list '{reserved}'.")
+                    break
+
+            if name in todolist_names:
                 os.remove(self.user_todolists[name].file_name)
                 todolist_names.remove(name)
                 print(f'Removing list {name}')
