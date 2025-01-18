@@ -91,11 +91,13 @@ class TodoList:
         print("Removing " + todo.text)
         self.pkl()
 
+        # cross out list item in most recent todolist in channel, if it exists
         if self.last_list_id:
             last_list = await self.get_last_list(bot)
             new_message_content = ""
             for line in last_list.content.splitlines(keepends = True):
-                if line.strip() == todo.compose_line().strip():
+                line_url = line.rpartition('(')[2].partition(')')[0] # match by url of message, which is in parens
+                if line_url == todo.url:
                     new_message_content += ("- ~~" + line[1:].strip() + "~~\n")
                 else:
                     new_message_content += (line)
@@ -200,7 +202,7 @@ class TodoCog(commands.Cog):
         if len(colon_split_msg) == 1: # if no list name given, this is the default list
             return DEFAULT_LIST
 
-        first_word = colon_split_msg[0].replace("--", "", 1).strip()
+        first_word = colon_split_msg[0].removeprefix("--").strip()
         if first_word == "daily" or first_word == "d":  # We don't manually init dailt
             return "daily"
         if first_word in self.get_todolist_names():
